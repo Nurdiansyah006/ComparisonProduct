@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowRightLeft, Link2, Check, X, AlertTriangle, Star, Gauge, ChevronDown, Plus,
   Trophy, Settings, Trash2, Lightbulb, ThumbsUp, Upload, Edit3,
@@ -475,7 +475,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const setRow = (i, k, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const delRow = (i) => rows.length > 1 && setRows(rows.filter((_, j) => j !== i));
 
-  const saveCat = () => {
+  const saveCat = async () => {
     const valid = rows.filter((r) => r.label.trim());
     if (!catLabel.trim() || valid.length === 0) { setCatMsg("Isi nama kategori dan minimal satu atribut."); return; }
     const id = slug(catLabel) || `cat-${Date.now()}`;
@@ -485,9 +485,14 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
       label: r.label.trim(), short: r.label.trim().slice(0, 11),
       unit: r.unit.trim(), type: r.type, better: r.type === "num" ? r.better : undefined,
     }));
-    setCats({ ...cats, [id]: { label: catLabel.trim(), attrs } });
-    setCatLabel(""); setRows([{ label: "", unit: "", type: "num", better: "high" }]);
-    setCatMsg(`Kategori "${catLabel.trim()}" ditambahkan. Sekarang tambahkan produknya di bawah.`);
+    try {
+      await supabase.from("categories").upsert({ id, label: catLabel.trim(), attrs });
+      setCats({ ...cats, [id]: { label: catLabel.trim(), attrs } });
+      setCatLabel(""); setRows([{ label: "", unit: "", type: "num", better: "high" }]);
+      setCatMsg(`Kategori "${catLabel.trim()}" ditambahkan.`);
+    } catch (err) {
+      setCatMsg("Gagal menyimpan ke database.");
+    }
   };
 
   // Produk
@@ -500,7 +505,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const pAttrs = cats[pCat]?.attrs || [];
   const setSpec = (k, v) => setSpecs({ ...specs, [k]: v });
 
-  const saveProd = () => {
+  const saveProd = async () => {
     if (!brand.trim() || !model.trim()) { setPMsg("Isi brand dan model."); return; }
     const built = {};
     pAttrs.forEach((a) => {
@@ -509,9 +514,15 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         : a.type === "bool" ? !!raw : (raw || "");
     });
     const id = `${slug(brand)}-${slug(model)}-${Math.random().toString(36).slice(2, 5)}`;
-    setProds([...prods, { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, specs: built }]);
-    setBrand(""); setModel(""); setUtama(false); setSpecs({});
-    setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan ke ${cats[pCat].label}.`);
+    const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, specs: built };
+    try {
+      await supabase.from("products").insert(newProd);
+      setProds([...prods, newProd]);
+      setBrand(""); setModel(""); setUtama(false); setSpecs({});
+      setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan.`);
+    } catch (err) {
+      setPMsg("Gagal menyimpan produk ke database.");
+    }
   };
 
   const [importJson, setImportJson] = useState("");
@@ -606,11 +617,11 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         </div>
       </div>
 
-      {/* Upload Datasheet */}
+      {/* Upload Produk / File (PDF/CSV/PNG etc) */}
       <div className="panel">
-        <div className="panel-h"><Upload size={14} /> Upload Datasheet</div>
+        <div className="panel-h"><Upload size={14} /> Upload Produk / File (PDF/CSV/PNG etc)</div>
         <div className="form">
-          <label className="lbl">Pilih file datasheet produk</label>
+          <label className="lbl">Pilih file produk / datasheet</label>
           <input type="file" accept=".json,.csv,.xlsx,.xls" className="inp" onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
@@ -618,7 +629,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
             const ext = file.name.split(".").pop().toLowerCase();
 
             if (ext === "json") {
-              reader.onload = (ev) => {
+              reader.onload = async (ev) => {
                 try {
                   const data = JSON.parse(ev.target.result);
                   if (!Array.isArray(data)) throw new Error("Format JSON harus berupa Array []");
@@ -631,6 +642,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       added++;
                     }
                   });
+                  await supabase.from("products").insert(newProds);
                   setProds([...prods, ...newProds]);
                   setImportMsg(`Berhasil mengimpor ${added} produk dari ${file.name}.`);
                 } catch (err) {
@@ -639,7 +651,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
               };
               reader.readAsText(file);
             } else if (ext === "csv" || ext === "xlsx" || ext === "xls") {
-              reader.onload = (ev) => {
+              reader.onload = async (ev) => {
                 try {
                   const wb = XLSX.read(ev.target.result, { type: "array" });
                   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -661,6 +673,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       added++;
                     }
                   });
+                  await supabase.from("products").insert(newProds);
                   setProds([...prods, ...newProds]);
                   setImportMsg(`Berhasil mengimpor ${added} produk dari ${file.name}.`);
                 } catch (err) {
@@ -712,7 +725,11 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       </td>
                       <td style={{ padding: "6px 8px", fontSize: 11, color: "var(--mut)" }}>{c.note}</td>
                       <td style={{ padding: "6px 8px" }}>
-                        <button className="icon-btn" title="Hapus" onClick={() => setCompat(compat.filter((_, j) => j !== i))}><Trash2 size={13} /></button>
+                        <button className="icon-btn" title="Hapus" onClick={async () => {
+                          const item = compat[i];
+                          if (item.id) await supabase.from("compatibilities").delete().match({ id: item.id });
+                          setCompat(compat.filter((_, j) => j !== i));
+                        }}><Trash2 size={13} /></button>
                       </td>
                     </tr>
                   );
@@ -723,7 +740,11 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
           </div>
 
           {/* Form tambah kompatibilitas */}
-          <CompatForm prods={prods} onAdd={(entry) => setCompat([...compat, entry])} />
+          <CompatForm prods={prods} onAdd={async (entry) => {
+            const newEntry = { ...entry, id: `cmp-${Date.now()}` };
+            await supabase.from("compatibilities").insert(newEntry);
+            setCompat([...compat, newEntry]);
+          }} />
         </div>
       </div>
 
@@ -777,12 +798,43 @@ function LoginScreen({ onLogin }) {
   );
 }
 
+import { supabase } from "./supabase";
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [cats, setCats] = useState(SEED_CATS);
   const [prods, setProds] = useState(SEED_PRODUCTS);
   const [compat, setCompat] = useState(COMPAT);
   const [tab, setTab] = useState("compare");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [catsRes, prodsRes, compatRes] = await Promise.all([
+          supabase.from("categories").select("*"),
+          supabase.from("products").select("*"),
+          supabase.from("compatibilities").select("*")
+        ]);
+        if (catsRes.data && catsRes.data.length > 0) {
+          const catsObj = {};
+          catsRes.data.forEach(c => { catsObj[c.id] = { label: c.label, attrs: c.attrs }; });
+          setCats(catsObj);
+        }
+        if (prodsRes.data && prodsRes.data.length > 0) {
+          setProds(prodsRes.data);
+        }
+        if (compatRes.data && compatRes.data.length > 0) {
+          setCompat(compatRes.data);
+        }
+      } catch (err) {
+        console.error("Error loading data from Supabase", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   if (!isAuthenticated) {
     return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
