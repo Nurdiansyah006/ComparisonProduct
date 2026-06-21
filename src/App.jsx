@@ -165,11 +165,15 @@ function Recommendation({ scored, ranked, attrs }) {
     <div className="reco">
       <div className="reco-h"><ThumbsUp size={15} /> Rekomendasi & ringkasan</div>
       <div className="reco-body">
-        <div className="reco-pick">
-          <span className="reco-medal"><Trophy size={16} /></span>
-          <div>
-            <div className="reco-pick-name">{nameOf(top)}</div>
-            <div className="reco-pick-sub">Skor tertinggi · {top.score}/100{top.utama ? " · brand utama Jaya ★" : ""}</div>
+        <div className="reco-pick" style={{ alignItems: "center" }}>
+          <span className="reco-medal" style={{ borderRadius: 8 }}><Trophy size={20} /></span>
+          {top.image && <img src={top.image} alt={top.model} style={{ width: 140, height: 90, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line)", padding: 4, background: "white" }} />}
+          <div style={{ flex: 1 }}>
+            <div className="reco-pick-name" style={{ fontSize: 20 }}>{nameOf(top)}</div>
+            <div className="reco-pick-sub" style={{ fontSize: 13, marginTop: 4 }}>
+              <span style={{ fontWeight: 700, color: "var(--ink)" }}>Skor tertinggi: {top.score}/100</span>
+              {top.utama && <span style={{ color: "var(--red)", marginLeft: 8 }}>★ Brand Utama Jaya</span>}
+            </div>
           </div>
         </div>
 
@@ -213,9 +217,29 @@ function Recommendation({ scored, ranked, attrs }) {
 /* ------------------------------ BANDINGKAN ------------------------------- */
 function CompareMode({ cats, prods }) {
   const catKeys = Object.keys(cats);
-  const [cat, setCat] = useState(catKeys[0]);
+  
+  const [initCat, initIds] = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    let c = params.get("cat");
+    let idsStr = params.get("ids");
+    if (!c || !catKeys.includes(c)) c = catKeys[0];
+    const availableProds = prods.filter((p) => p.cat === c);
+    let i = idsStr ? idsStr.split(",") : [];
+    i = i.filter(id => availableProds.some(p => p.id === id));
+    if (i.length < 2) i = availableProds.slice(0, 3).map(p => p.id);
+    return [c, i];
+  }, [catKeys, prods]);
+
+  const [cat, setCat] = useState(initCat);
+  const [ids, setIds] = useState(initIds);
   const list = prods.filter((p) => p.cat === cat);
-  const [ids, setIds] = useState(list.slice(0, 3).map((p) => p.id));
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("cat", cat);
+    params.set("ids", ids.join(","));
+    window.history.replaceState(null, "", "?" + params.toString());
+  }, [cat, ids]);
 
   const onCat = (c) => { setCat(c); setIds(prods.filter((p) => p.cat === c).slice(0, 3).map((p) => p.id)); };
   const remove = (id) => ids.length > 2 && setIds(ids.filter((x) => x !== id));
@@ -258,28 +282,44 @@ function CompareMode({ cats, prods }) {
     pdf.save(`bandingan-${cat}.pdf`);
   };
 
+  const isPrintMode = new URLSearchParams(window.location.search).get("print") === "true";
+
+  const copyLink = () => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("print", "true");
+    const shareUrl = window.location.origin + window.location.pathname + "?" + params.toString();
+    navigator.clipboard.writeText(shareUrl);
+    alert("Tautan statis hasil perbandingan berhasil disalin!");
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div className="cat-row" style={{ marginBottom: 0 }}>
-          {catKeys.map((k) => (
-            <button key={k} className={`chip ${cat === k ? "chip-on" : ""}`} onClick={() => onCat(k)}>{cats[k].label}</button>
-          ))}
+      {!isPrintMode && (
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 14 }}>
+          <div className="cat-row" style={{ marginBottom: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {catKeys.map((k) => (
+              <button key={k} className={`chip ${cat === k ? "chip-on" : ""}`} onClick={() => onCat(k)}>{cats[k].label}</button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn-action" onClick={copyLink}>Salin Link</button>
+            <button className="btn-action" onClick={downloadPNG}>Unduh PNG</button>
+            <button className="btn-action" onClick={downloadPDF}>Unduh PDF</button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-ghost" style={{ margin: 0, border: "1px solid var(--line)" }} onClick={downloadPNG}>Unduh PNG</button>
-          <button className="btn-ghost" style={{ margin: 0, border: "1px solid var(--line)" }} onClick={downloadPDF}>Unduh PDF</button>
-        </div>
-      </div>
+      )}
 
-      <div ref={captureRef} style={{ background: "var(--paper)", padding: "10px" }}>
+      <div ref={captureRef} style={{ background: "var(--paper)", padding: isPrintMode ? "20px" : "10px" }}>
         <label className="lbl">Produk dibandingkan ({ids.length}/5)</label>
       <div className="slot-row">
         {selected.map((p) => (
-          <span className="slot" key={p.id} style={{ borderColor: colorOf(p.id) }}>
+          <span className="slot" key={p.id} style={{ borderColor: colorOf(p.id), display: "flex", flexDirection: "column", alignItems: "center", gap: 4, textAlign: "center" }}>
             <i className="dot" style={{ background: colorOf(p.id) }} />
-            <b>{p.brand}</b> {p.model.split("(")[0].trim()}
-            {p.utama && <Star size={11} strokeWidth={2.5} className="slot-star" />}
+            {p.image && <img src={p.image} alt={p.model} style={{ height: 40, width: "auto", objectFit: "contain", borderRadius: 4 }} />}
+            <div>
+              <b>{p.brand}</b> {p.model.split("(")[0].trim()}
+              {p.utama && <Star size={11} strokeWidth={2.5} className="slot-star" />}
+            </div>
             {ids.length > 2 && <button className="slot-x" onClick={() => remove(p.id)}><X size={13} /></button>}
           </span>
         ))}
@@ -361,6 +401,14 @@ function CompareMode({ cats, prods }) {
                       </tr>
                     );
                   })}
+                  <tr>
+                    <td className="td-attr">Catatan Tambahan<br/><span style={{fontSize: 10, color: "var(--mut)"}}>(Aftersales, Warranty, dll)</span></td>
+                    {scored.map((p) => (
+                      <td key={`note-${p.id}`} className="td-val" style={{ whiteSpace: "pre-wrap", fontSize: 11, textAlign: "left", verticalAlign: "top" }}>
+                        {p.note || "—"}
+                      </td>
+                    ))}
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -499,6 +547,8 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const catKeys = Object.keys(cats);
   const [pCat, setPCat] = useState(catKeys[0]);
   const [brand, setBrand] = useState(""); const [model, setModel] = useState("");
+  const [image, setImage] = useState("");
+  const [note, setNote] = useState("");
   const [utama, setUtama] = useState(false);
   const [specs, setSpecs] = useState({});
   const [pMsg, setPMsg] = useState("");
@@ -514,11 +564,11 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         : a.type === "bool" ? !!raw : (raw || "");
     });
     const id = `${slug(brand)}-${slug(model)}-${Math.random().toString(36).slice(2, 5)}`;
-    const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, specs: built };
+    const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, image: image.trim(), note: note.trim(), specs: built };
     try {
       await supabase.from("products").insert(newProd);
       setProds([...prods, newProd]);
-      setBrand(""); setModel(""); setUtama(false); setSpecs({});
+      setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({});
       setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan.`);
     } catch (err) {
       setPMsg("Gagal menyimpan produk ke database.");
@@ -598,6 +648,13 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
           <div className="grid2 mt">
             <div><label className="lbl">Brand</label><input className="inp" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="mis. CHC" /></div>
             <div><label className="lbl">Model</label><input className="inp" value={model} onChange={(e) => setModel(e.target.value)} placeholder="mis. X700" /></div>
+          </div>
+          <div className="mt">
+            <label className="lbl">URL Gambar (Opsional)</label><input className="inp" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://..." style={{width: "100%"}} />
+          </div>
+          <div className="mt">
+            <label className="lbl">Catatan Tambahan (Aftersales, Warranty, dll)</label>
+            <textarea className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Informasi nilai tambah produk..." style={{width: "100%", resize: "vertical", minHeight: 60}} />
           </div>
           <label className="lbl mt">Spesifikasi ({cats[pCat]?.label})</label>
           <div className="spec-grid">
@@ -801,7 +858,8 @@ function LoginScreen({ onLogin }) {
 import { supabase } from "./supabase";
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const isPrintMode = new URLSearchParams(window.location.search).get("print") === "true";
+  const [isAuthenticated, setIsAuthenticated] = useState(isPrintMode);
   const [cats, setCats] = useState(SEED_CATS);
   const [prods, setProds] = useState(SEED_PRODUCTS);
   const [compat, setCompat] = useState(COMPAT);
@@ -941,6 +999,8 @@ export default function App() {
         .icon-btn{border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--mut);height:36px;display:flex;align-items:center;justify-content:center}
         .icon-btn:hover{color:var(--red);border-color:var(--red)}
         .btn-ghost{font-family:var(--mono);font-size:11px;font-weight:600;background:none;border:1px dashed var(--mut);color:var(--mut);padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:4px}
+        .btn-action{font-family:var(--disp);font-size:12px;font-weight:600;background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px 14px;cursor:pointer;border-radius:4px;transition:all 0.2s}
+        .btn-action:hover{border-color:var(--ink);background:var(--paper)}
         .btn{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.5px;background:var(--red);color:#fff;border:none;padding:10px 18px;cursor:pointer}
         .btn:hover{background:var(--red-d)}
         .form-foot{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
@@ -975,11 +1035,13 @@ export default function App() {
       </div>
 
       <div className="body">
-        <div className="tabs">
-          <button className={tab === "compare" ? "on" : ""} onClick={() => setTab("compare")}><Gauge size={14} /> Bandingkan</button>
-          <button className={tab === "compat" ? "on" : ""} onClick={() => setTab("compat")}><Link2 size={14} /> Kompatibilitas</button>
-          <button className={tab === "manage" ? "on" : ""} onClick={() => setTab("manage")}><Settings size={14} /> Kelola</button>
-        </div>
+        {!isPrintMode && (
+          <div className="tabs">
+            <button className={tab === "compare" ? "on" : ""} onClick={() => setTab("compare")}><Gauge size={14} /> Bandingkan</button>
+            <button className={tab === "compat" ? "on" : ""} onClick={() => setTab("compat")}><Link2 size={14} /> Kompatibilitas</button>
+            <button className={tab === "manage" ? "on" : ""} onClick={() => setTab("manage")}><Settings size={14} /> Kelola</button>
+          </div>
+        )}
 
         {tab === "compare" && <CompareMode cats={cats} prods={prods} />}
         {tab === "compat" && <CompatMode prods={prods} compat={compat} />}
