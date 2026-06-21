@@ -519,6 +519,45 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const [rows, setRows] = useState([{ label: "", unit: "", type: "num", better: "high" }]);
   const [catMsg, setCatMsg] = useState("");
 
+  // Users state
+  const [appUsers, setAppUsers] = useState([]);
+  const [uName, setUMame] = useState("");
+  const [uPwd, setUPwd] = useState("");
+  const [uRole, setURole] = useState("user");
+  const [uMsg, setUMsg] = useState("");
+
+  useEffect(() => {
+    async function loadUsers() {
+      const { data } = await supabase.from("app_users").select("*");
+      if (data) setAppUsers(data);
+    }
+    loadUsers();
+  }, []);
+
+  const saveUser = async () => {
+    if (!uName.trim() || !uPwd.trim()) { setUMsg("Username dan password wajib diisi"); return; }
+    try {
+      const { data, error } = await supabase.from("app_users").insert({ username: uName.trim(), password: uPwd.trim(), role: uRole }).select();
+      if (error) throw error;
+      if (data) setAppUsers([...appUsers, ...data]);
+      setUMame(""); setUPwd(""); setURole("user");
+      setUMsg("User berhasil ditambahkan!");
+    } catch (err) {
+      setUMsg("Gagal menambah user: " + err.message);
+    }
+  };
+
+  const delUser = async (id) => {
+    await supabase.from("app_users").delete().eq("id", id);
+    setAppUsers(appUsers.filter(u => u.id !== id));
+  };
+
+  const delProd = async (id) => {
+    await supabase.from("products").delete().eq("id", id);
+    setProds(prods.filter(p => p.id !== id));
+  };
+
+
   const addRow = () => setRows([...rows, { label: "", unit: "", type: "num", better: "high" }]);
   const setRow = (i, k, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const delRow = (i) => rows.length > 1 && setRows(rows.filter((_, j) => j !== i));
@@ -602,7 +641,57 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
 
   return (
     <div>
-      <div className="note-bar"><AlertTriangle size={13} /> Data tersimpan sementara di sesi ini (demo). Pada versi Supabase, ini disimpan permanen di tabel <code>categories</code>, <code>attributes</code>, dan <code>products</code>.</div>
+      <div className="note-bar"><AlertTriangle size={13} /> Panel Administrasi: Anda masuk sebagai Admin. Semua perubahan yang dilakukan di sini akan tersimpan ke database.</div>
+
+      {/* Kelola Pengguna */}
+      <div className="panel">
+        <div className="panel-h"><Settings size={14} /> Kelola Pengguna (Akses Login)</div>
+        <div className="form">
+          <div style={{ overflowX: "auto", marginBottom: 16 }}>
+            <table className="cmp-table" style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "var(--line)", textAlign: "left" }}>
+                  <th style={{ padding: "6px 8px" }}>Username</th>
+                  <th style={{ padding: "6px 8px" }}>Password (Hint)</th>
+                  <th style={{ padding: "6px 8px" }}>Role</th>
+                  <th style={{ padding: "6px 8px", width: 60 }}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appUsers.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{u.username}</td>
+                    <td style={{ padding: "6px 8px", fontFamily: "var(--mono)", color: "var(--mut)" }}>{u.password}</td>
+                    <td style={{ padding: "6px 8px" }}>
+                      <span className="chip" style={{ padding: "3px 6px", fontSize: 10 }}>{u.role.toUpperCase()}</span>
+                    </td>
+                    <td style={{ padding: "6px 8px" }}>
+                      <button className="icon-btn" title="Hapus" onClick={() => delUser(u.id)}><Trash2 size={13} /></button>
+                    </td>
+                  </tr>
+                ))}
+                {appUsers.length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Memuat data pengguna...</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          <label className="lbl">Tambah Pengguna Baru</label>
+          <div className="grid2">
+            <input className="inp" value={uName} onChange={e => setUMame(e.target.value)} placeholder="Username" />
+            <input className="inp" type="password" value={uPwd} onChange={e => setUPwd(e.target.value)} placeholder="Password" />
+          </div>
+          <div className="grid2 mt" style={{ alignItems: "center" }}>
+            <select className="inp" value={uRole} onChange={e => setURole(e.target.value)}>
+              <option value="user">USER (Hanya Lihat & Bandingkan)</option>
+              <option value="admin">ADMIN (Kelola Data & Pengguna)</option>
+            </select>
+            <div className="form-foot" style={{ marginTop: 0 }}>
+              <button className="btn" onClick={saveUser}>Tambah User</button>
+              {uMsg && <span className="msg">{uMsg}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Tambah kategori */}
       <div className="panel">
@@ -670,6 +759,38 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
           <div className="form-foot">
             <button className="btn" onClick={saveProd}>Simpan produk</button>
             {pMsg && <span className="msg"><Check size={13} /> {pMsg}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Daftar Produk (Hapus) */}
+      <div className="panel">
+        <div className="panel-h"><Settings size={14} /> Daftar Produk Tersimpan</div>
+        <div className="form">
+          <div style={{ overflowX: "auto" }}>
+            <table className="cmp-table" style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "var(--line)", textAlign: "left" }}>
+                  <th style={{ padding: "6px 8px" }}>Brand</th>
+                  <th style={{ padding: "6px 8px" }}>Model</th>
+                  <th style={{ padding: "6px 8px" }}>Kategori</th>
+                  <th style={{ padding: "6px 8px", width: 60 }}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prods.map((p) => (
+                  <tr key={p.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{p.brand}</td>
+                    <td style={{ padding: "6px 8px", fontFamily: "var(--mono)" }}>{p.model}</td>
+                    <td style={{ padding: "6px 8px", color: "var(--mut)" }}>{cats[p.cat]?.label}</td>
+                    <td style={{ padding: "6px 8px" }}>
+                      <button className="icon-btn" title="Hapus Produk" onClick={() => delProd(p.id)}><Trash2 size={13} /></button>
+                    </td>
+                  </tr>
+                ))}
+                {prods.length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Belum ada produk.</td></tr>}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -822,14 +943,40 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
 }
 
 /* --------------------------------- APP ----------------------------------- */
+import { supabase } from "./supabase";
+
 function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState("");
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
-  const submit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
-    if (pwd === "admin123") onLogin();
-    else setErr("Password salah");
+    setErr("");
+    setLoading(true);
+
+    try {
+      // Very basic plain-text password check against app_users table for demo purposes
+      const { data, error } = await supabase
+        .from("app_users")
+        .select("*")
+        .eq("username", username)
+        .eq("password", pwd)
+        .single();
+
+      if (error || !data) {
+        setErr("Username atau Password salah");
+      } else {
+        onLogin(data);
+      }
+    } catch (err) {
+      setErr("Terjadi kesalahan sistem");
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
     <div className="wrap" style={{ padding: 40, textAlign: "center" }}>
       <style>{`
@@ -843,26 +990,28 @@ function LoginScreen({ onLogin }) {
         .wrap{font-family:var(--disp);color:var(--ink);background:var(--paper);border:1px solid var(--ink);max-width:840px;border-top:5px solid var(--red);margin:0 auto;}
         .inp{font-family:var(--disp);font-size:13px;font-weight:500;padding:9px 11px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
         .btn{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.5px;background:var(--red);color:#fff;border:none;padding:10px 18px;cursor:pointer}
+        .btn:disabled{opacity:0.6;cursor:not-allowed}
       `}</style>
-      <h2 style={{ marginBottom: 10 }}>Masukkan Password</h2>
-      <p style={{ fontSize: 13, color: "var(--mut)", marginBottom: 20 }}>Untuk mengakses fitur ini, Anda memerlukan akses khusus.</p>
-      <form onSubmit={submit}>
-        <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} className="inp" style={{ width: 200, display: "inline-block" }} placeholder="Password..." />
-        <button type="submit" className="btn" style={{ marginLeft: 10 }}>Masuk</button>
+      <h2 style={{ marginBottom: 10 }}>Login Akses</h2>
+      <p style={{ fontSize: 13, color: "var(--mut)", marginBottom: 20 }}>Silakan masuk menggunakan akun yang telah didaftarkan oleh Admin.</p>
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+        <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="inp" style={{ width: 240 }} placeholder="Username" required />
+        <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} className="inp" style={{ width: 240 }} placeholder="Password" required />
+        <button type="submit" className="btn" style={{ width: 240 }} disabled={loading}>
+          {loading ? "Memeriksa..." : "Masuk"}
+        </button>
       </form>
-      {err && <div style={{ color: "var(--red)", marginTop: 10, fontSize: 13 }}>{err}</div>}
+      {err && <div style={{ color: "var(--red)", marginTop: 15, fontSize: 13, fontWeight: 600 }}>{err}</div>}
     </div>
   );
 }
 
-import { supabase } from "./supabase";
-
 export default function App() {
   const isPrintMode = new URLSearchParams(window.location.search).get("print") === "true";
-  const [isAuthenticated, setIsAuthenticated] = useState(isPrintMode);
-  const [cats, setCats] = useState(SEED_CATS);
-  const [prods, setProds] = useState(SEED_PRODUCTS);
-  const [compat, setCompat] = useState(COMPAT);
+  const [user, setUser] = useState(isPrintMode ? { role: 'user' } : null);
+  const [cats, setCats] = useState({});
+  const [prods, setProds] = useState([]);
+  const [compat, setCompat] = useState([]);
   const [tab, setTab] = useState("compare");
   const [loading, setLoading] = useState(true);
 
@@ -894,9 +1043,11 @@ export default function App() {
     loadData();
   }, []);
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+  if (!user) {
+    return <LoginScreen onLogin={(u) => setUser(u)} />;
   }
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="wrap">
@@ -1039,7 +1190,7 @@ export default function App() {
           <div className="tabs">
             <button className={tab === "compare" ? "on" : ""} onClick={() => setTab("compare")}><Gauge size={14} /> Bandingkan</button>
             <button className={tab === "compat" ? "on" : ""} onClick={() => setTab("compat")}><Link2 size={14} /> Kompatibilitas</button>
-            <button className={tab === "manage" ? "on" : ""} onClick={() => setTab("manage")}><Settings size={14} /> Kelola</button>
+            {isAdmin && <button className={tab === "manage" ? "on" : ""} onClick={() => setTab("manage")}><Settings size={14} /> Kelola</button>}
           </div>
         )}
 
