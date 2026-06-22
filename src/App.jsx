@@ -218,6 +218,15 @@ function Recommendation({ scored, ranked, attrs }) {
 function CompareMode({ cats, prods }) {
   const catKeys = Object.keys(cats);
   
+  if (catKeys.length === 0) {
+    return (
+      <div className="empty" style={{ padding: 40, textAlign: "center", color: "var(--mut)" }}>
+        Belum ada data kategori alat ukur. <br/>
+        Silakan minta Admin untuk menambahkan kategori terlebih dahulu melalui tab Kelola.
+      </div>
+    );
+  }
+
   const [initCat, initIds] = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     let c = params.get("cat");
@@ -1009,7 +1018,7 @@ function LoginScreen({ onLogin }) {
 export default function App() {
   const isPrintMode = new URLSearchParams(window.location.search).get("print") === "true";
   const [user, setUser] = useState(isPrintMode ? { role: 'user' } : null);
-  const [cats, setCats] = useState({});
+  const [cats, setCats] = useState(SEED_CATS);
   const [prods, setProds] = useState([]);
   const [compat, setCompat] = useState([]);
   const [tab, setTab] = useState("compare");
@@ -1023,11 +1032,14 @@ export default function App() {
           supabase.from("products").select("*"),
           supabase.from("compatibilities").select("*")
         ]);
+        
+        // Merge Supabase categories with the local default SEED_CATS
+        const catsObj = { ...SEED_CATS };
         if (catsRes.data && catsRes.data.length > 0) {
-          const catsObj = {};
           catsRes.data.forEach(c => { catsObj[c.id] = { label: c.label, attrs: c.attrs }; });
-          setCats(catsObj);
         }
+        setCats(catsObj);
+        
         if (prodsRes.data && prodsRes.data.length > 0) {
           setProds(prodsRes.data);
         }
