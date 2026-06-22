@@ -581,7 +581,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                 </tr>
               </thead>
               <tbody>
-                {appUsers.filter(u => u.username !== "jayasurveying0").map((u) => (
+                {appUsers.filter(u => u.username !== "jayasurveying0" && u.username !== "jayasurveying0@gmail.com").map((u) => (
                   <tr key={u.id} style={{ borderBottom: "1px solid var(--line)" }}>
                     <td style={{ padding: "6px 8px", fontWeight: 600 }}>{u.username}</td>
                     <td style={{ padding: "6px 8px", fontFamily: "var(--mono)", color: "var(--mut)" }}>
@@ -609,7 +609,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                     </td>
                   </tr>
                 ))}
-                {appUsers.filter(u => u.username !== "jayasurveying0").length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Belum ada pengguna terdaftar.</td></tr>}
+                {appUsers.filter(u => u.username !== "jayasurveying0" && u.username !== "jayasurveying0@gmail.com").length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Belum ada pengguna terdaftar.</td></tr>}
               </tbody>
             </table>
           </div>
