@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowRightLeft, Link2, Check, X, AlertTriangle, Star, Gauge, ChevronDown, Plus,
-  Trophy, Settings, Trash2, Lightbulb, ThumbsUp, Upload, Edit3,
+  Trophy, Settings, Trash2, Lightbulb, ThumbsUp, Upload, Edit3, Edit2, LogOut
 } from "lucide-react";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip,
@@ -434,6 +434,15 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const [uRole, setURole] = useState("user");
   const [uMsg, setUMsg] = useState("");
 
+  const [editUserId, setEditUserId] = useState(null);
+  const [editUserPwd, setEditUserPwd] = useState("");
+
+  const [editProdId, setEditProdId] = useState(null);
+
+  const [editCompatId, setEditCompatId] = useState(null);
+  const [editCompatStatus, setEditCompatStatus] = useState("ok");
+  const [editCompatNote, setEditCompatNote] = useState("");
+
   useEffect(() => {
     async function loadUsers() {
       const { data } = await supabase.from("app_users").select("*");
@@ -510,13 +519,19 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
       built[a.key] = a.type === "num" ? (raw === "" || raw == null ? null : Number(raw))
         : a.type === "bool" ? !!raw : (raw || "");
     });
-    const id = `${slug(brand)}-${slug(model)}-${Math.random().toString(36).slice(2, 5)}`;
+    const id = editProdId || `${slug(brand)}-${slug(model)}-${Math.random().toString(36).slice(2, 5)}`;
     const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, image: image.trim(), note: note.trim(), specs: built };
     try {
-      await supabase.from("products").insert(newProd);
-      setProds([...prods, newProd]);
+      await supabase.from("products").upsert(newProd);
+      if (editProdId) {
+        setProds(prods.map(p => p.id === editProdId ? newProd : p));
+        setPMsg(`Produk "${brand.trim()} ${model.trim()}" berhasil diupdate.`);
+        setEditProdId(null);
+      } else {
+        setProds([...prods, newProd]);
+        setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan.`);
+      }
       setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({});
-      setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan.`);
     } catch (err) {
       setPMsg("Gagal menyimpan produk ke database.");
     }
@@ -566,19 +581,35 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                 </tr>
               </thead>
               <tbody>
-                {appUsers.map((u) => (
+                {appUsers.filter(u => u.username !== "jayasurveying0").map((u) => (
                   <tr key={u.id} style={{ borderBottom: "1px solid var(--line)" }}>
                     <td style={{ padding: "6px 8px", fontWeight: 600 }}>{u.username}</td>
-                    <td style={{ padding: "6px 8px", fontFamily: "var(--mono)", color: "var(--mut)" }}>{u.password}</td>
+                    <td style={{ padding: "6px 8px", fontFamily: "var(--mono)", color: "var(--mut)" }}>
+                      {editUserId === u.id ? (
+                        <input className="inp" style={{padding: "4px 8px", fontSize: 11}} value={editUserPwd} onChange={e => setEditUserPwd(e.target.value)} placeholder="Password Baru" />
+                      ) : (
+                        u.password
+                      )}
+                    </td>
                     <td style={{ padding: "6px 8px" }}>
                       <span className="chip" style={{ padding: "3px 6px", fontSize: 10 }}>{u.role.toUpperCase()}</span>
                     </td>
                     <td style={{ padding: "6px 8px" }}>
-                      <button className="icon-btn" title="Hapus" onClick={() => delUser(u.id)}><Trash2 size={13} /></button>
+                      {editUserId === u.id ? (
+                        <button className="icon-btn" style={{color: "var(--ink)", display: "inline-block", marginRight: 4}} title="Simpan" onClick={async () => {
+                          if (!editUserPwd.trim()) return;
+                          await supabase.from("app_users").update({ password: editUserPwd.trim() }).eq("id", u.id);
+                          setAppUsers(appUsers.map(x => x.id === u.id ? { ...x, password: editUserPwd.trim() } : x));
+                          setEditUserId(null); setEditUserPwd("");
+                        }}><Check size={13} /></button>
+                      ) : (
+                        <button className="icon-btn" style={{display: "inline-block", marginRight: 4}} title="Edit Password" onClick={() => { setEditUserId(u.id); setEditUserPwd(""); }}><Edit2 size={13} /></button>
+                      )}
+                      <button className="icon-btn" style={{display: "inline-block"}} title="Hapus" onClick={() => delUser(u.id)}><Trash2 size={13} /></button>
                     </td>
                   </tr>
                 ))}
-                {appUsers.length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Memuat data pengguna...</td></tr>}
+                {appUsers.filter(u => u.username !== "jayasurveying0").length === 0 && <tr><td colSpan={4} style={{ padding: "12px", textAlign: "center", color: "var(--mut)" }}>Belum ada pengguna terdaftar.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -630,9 +661,9 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         </div>
       </div>
 
-      {/* Tambah produk */}
-      <div className="panel">
-        <div className="panel-h"><Plus size={14} /> Tambah produk</div>
+      {/* Tambah/Edit produk */}
+      <div className="panel" id="product-form-panel">
+        <div className="panel-h">{editProdId ? <Edit2 size={14} /> : <Plus size={14} />} {editProdId ? "Edit produk" : "Tambah produk"}</div>
         <div className="form">
           <div className="grid2">
             <div><label className="lbl">Kategori</label>
@@ -665,7 +696,10 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
             ))}
           </div>
           <div className="form-foot">
-            <button className="btn" onClick={saveProd}>Simpan produk</button>
+            <button className="btn" onClick={saveProd}>{editProdId ? "Update produk" : "Simpan produk"}</button>
+            {editProdId && <button className="btn-ghost" onClick={() => {
+              setEditProdId(null); setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({});
+            }}>Batal Edit</button>}
             {pMsg && <span className="msg"><Check size={13} /> {pMsg}</span>}
           </div>
         </div>
@@ -692,7 +726,12 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                     <td style={{ padding: "6px 8px", fontFamily: "var(--mono)" }}>{p.model}</td>
                     <td style={{ padding: "6px 8px", color: "var(--mut)" }}>{cats[p.cat]?.label}</td>
                     <td style={{ padding: "6px 8px" }}>
-                      <button className="icon-btn" title="Hapus Produk" onClick={() => delProd(p.id)}><Trash2 size={13} /></button>
+                      <button className="icon-btn" style={{display: "inline-block", marginRight: 4}} title="Edit Produk" onClick={() => {
+                        setEditProdId(p.id); setPCat(p.cat); setBrand(p.brand); setModel(p.model);
+                        setImage(p.image || ""); setNote(p.note || ""); setUtama(p.utama || false); setSpecs(p.specs || {});
+                        document.getElementById('product-form-panel').scrollIntoView({ behavior: 'smooth' });
+                      }}><Edit2 size={13} /></button>
+                      <button className="icon-btn" style={{display: "inline-block"}} title="Hapus Produk" onClick={() => delProd(p.id)}><Trash2 size={13} /></button>
                     </td>
                   </tr>
                 ))}
@@ -807,11 +846,36 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       <td style={{ padding: "6px 8px" }}>{dr ? `${dr.brand} ${dr.model}` : c.drone}</td>
                       <td style={{ padding: "6px 8px" }}>{pl ? `${pl.brand} ${pl.model}` : c.payload}</td>
                       <td style={{ padding: "6px 8px" }}>
-                        <span style={{ color: statusColors[c.status] || "var(--ink)", fontWeight: 600 }}>{statusLabels[c.status] || c.status}</span>
+                        {editCompatId === c.id ? (
+                          <select className="inp" style={{padding: "4px"}} value={editCompatStatus} onChange={(e) => setEditCompatStatus(e.target.value)}>
+                            <option value="ok">Kompatibel</option>
+                            <option value="adapter">Perlu Adapter</option>
+                            <option value="no">Tidak Kompatibel</option>
+                          </select>
+                        ) : (
+                          <span style={{ color: statusColors[c.status] || "var(--ink)", fontWeight: 600 }}>{statusLabels[c.status] || c.status}</span>
+                        )}
                       </td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, color: "var(--mut)" }}>{c.note}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, color: "var(--mut)" }}>
+                        {editCompatId === c.id ? (
+                          <input className="inp" style={{padding: "4px"}} value={editCompatNote} onChange={(e) => setEditCompatNote(e.target.value)} />
+                        ) : (
+                          c.note
+                        )}
+                      </td>
                       <td style={{ padding: "6px 8px" }}>
-                        <button className="icon-btn" title="Hapus" onClick={async () => {
+                        {editCompatId === c.id ? (
+                          <button className="icon-btn" style={{color: "var(--ink)", display: "inline-block", marginRight: 4}} title="Simpan" onClick={async () => {
+                            await supabase.from("compatibilities").update({ status: editCompatStatus, note: editCompatNote }).eq("id", c.id);
+                            setCompat(compat.map(x => x.id === c.id ? { ...x, status: editCompatStatus, note: editCompatNote } : x));
+                            setEditCompatId(null);
+                          }}><Check size={13} /></button>
+                        ) : (
+                          <button className="icon-btn" style={{display: "inline-block", marginRight: 4}} title="Edit" onClick={() => {
+                            setEditCompatId(c.id); setEditCompatStatus(c.status); setEditCompatNote(c.note || "");
+                          }}><Edit2 size={13} /></button>
+                        )}
+                        <button className="icon-btn" style={{display: "inline-block"}} title="Hapus" onClick={async () => {
                           const item = compat[i];
                           if (item.id) await supabase.from("compatibilities").delete().match({ id: item.id });
                           setCompat(compat.filter((_, j) => j !== i));
@@ -1094,6 +1158,16 @@ export default function App() {
         <img src={LOGO} alt="Jaya Survey Indonesia" />
         <span className="tool">Product Comparison</span>
         <span className="eyebrow">Engine v2</span>
+        {user && (
+          <button 
+            className="btn" 
+            style={{padding: "5px 12px", fontSize: 11, marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, borderRadius: 4}} 
+            onClick={() => setUser(null)}
+            title="Logout"
+          >
+            <LogOut size={13} /> Logout
+          </button>
+        )}
       </div>
 
       <div className="body">
