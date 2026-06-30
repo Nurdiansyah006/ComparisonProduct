@@ -1136,12 +1136,27 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                         }
                       });
                       
+                      const id = `${slug(detectedBrand || 'brand')}-${slug(detectedModel || 'model')}-${Math.random().toString(36).slice(2, 5)}`;
+                      const newProd = {
+                        id,
+                        cat: detectedCat,
+                        brand: (detectedBrand || "Unknown").trim(),
+                        model: (detectedModel || "Unknown").trim(),
+                        utama: false,
+                        image: "",
+                        note: "",
+                        specs: detectedSpecs
+                      };
+                      
+                      await supabase.from("products").insert([newProd]);
+                      setProds([...prods, newProd]);
+                      
                       setPCat(detectedCat);
-                      setBrand(detectedBrand || "");
-                      setModel(detectedModel || "");
+                      setBrand((detectedBrand || "Unknown").trim());
+                      setModel((detectedModel || "Unknown").trim());
                       setSpecs(detectedSpecs);
-                      setSubTab("prods");
-                      setImportMsg(`Identifikasi PDF Berhasil! Brand: ${detectedBrand || 'Mungkin CHC/DJI'}, Model: ${detectedModel || 'Tidak terdeteksi'}. Silakan lengkapi dan simpan.`);
+                      setSubTab("list");
+                      setImportMsg(`Berhasil mengidentifikasi & menyimpan produk "${newProd.brand} ${newProd.model}" ke database.`);
                     } catch (err) {
                       setImportMsg("Gagal mengidentifikasi PDF: " + err.message);
                     }
