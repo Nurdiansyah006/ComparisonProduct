@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowRightLeft, Link2, Check, X, AlertTriangle, Star, Gauge, ChevronDown, Plus,
-  Trophy, Settings, Trash2, Lightbulb, ThumbsUp, Upload, Edit3, Edit2, LogOut
+  Trophy, Settings, Trash2, Lightbulb, ThumbsUp, Upload, Edit3, Edit2, LogOut, FileText, ExternalLink
 } from "lucide-react";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip,
@@ -321,6 +321,40 @@ function CompareMode({ theme, cats, prods }) {
                       </td>
                     ))}
                   </tr>
+                  <tr>
+                    <td className="td-attr"><FileText size={12} style={{marginRight: 4, verticalAlign: "middle"}} />Datasheet PDF</td>
+                    {scored.map((p) => (
+                      <td key={`ds-${p.id}`} className="td-val">
+                        {p.datasheet_url ? (
+                          <a
+                            href={p.datasheet_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "5px 12px",
+                              borderRadius: 8,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: "#4f46e5",
+                              background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
+                              textDecoration: "none",
+                              transition: "all 0.2s ease",
+                              border: "1px solid #c7d2fe",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #e0e7ff, #c7d2fe)"; e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(79,70,229,0.15)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #eef2ff, #e0e7ff)"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+                          >
+                            <FileText size={12} /> Lihat Datasheet <ExternalLink size={10} />
+                          </a>
+                        ) : (
+                          <span style={{ color: "var(--mut)", fontSize: 11 }}>—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -526,6 +560,8 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
   const [note, setNote] = useState("");
   const [utama, setUtama] = useState(false);
   const [specs, setSpecs] = useState({});
+  const [datasheetUrl, setDatasheetUrl] = useState("");
+  const datasheetFileRef = useRef(null);
   const [pMsg, setPMsg] = useState("");
   const pAttrs = cats[pCat]?.attrs || [];
   const setSpec = (k, v) => setSpecs({ ...specs, [k]: v });
@@ -632,7 +668,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         : a.type === "bool" ? !!raw : (raw || "");
     });
     const id = editProdId || `${slug(brand)}-${slug(model)}-${Math.random().toString(36).slice(2, 5)}`;
-    const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, image: image.trim(), note: note.trim(), specs: built };
+    const newProd = { id, cat: pCat, brand: brand.trim(), model: model.trim(), utama, image: image.trim(), note: note.trim(), specs: built, datasheet_url: datasheetUrl || null };
     try {
       await supabase.from("products").upsert(newProd);
       if (editProdId) {
@@ -643,7 +679,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
         setProds([...prods, newProd]);
         setPMsg(`Produk "${brand.trim()} ${model.trim()}" ditambahkan.`);
       }
-      setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({});
+      setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({}); setDatasheetUrl(""); datasheetFileRef.current = null;
     } catch (err) {
       setPMsg("Gagal menyimpan produk ke database.");
     }
@@ -827,6 +863,24 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                 <label className="lbl">Catatan Tambahan (Aftersales, Warranty, dll)</label>
                 <textarea className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Informasi nilai tambah produk..." style={{width: "100%", resize: "vertical", minHeight: 60}} />
               </div>
+              {datasheetUrl && (
+                <div className="mt" style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 12px", borderRadius: 8,
+                  background: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+                  border: "1px solid #bbf7d0",
+                  animation: "pdfSlideIn 0.3s ease forwards",
+                }}>
+                  <FileText size={16} style={{ color: "#16a34a", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#15803d" }}>📄 Datasheet PDF terlampir</div>
+                    <a href={datasheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#4f46e5", wordBreak: "break-all" }}>{datasheetUrl.split("/").pop()}</a>
+                  </div>
+                  <button onClick={() => { setDatasheetUrl(""); datasheetFileRef.current = null; }} style={{
+                    background: "none", border: "none", cursor: "pointer", color: "var(--mut)", padding: 2,
+                  }}><X size={14} /></button>
+                </div>
+              )}
               <label className="lbl mt">Spesifikasi ({cats[pCat]?.label})</label>
               <div className="spec-grid">
                 {pAttrs.map((a) => (
@@ -841,7 +895,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
               <div className="form-foot">
                 <button className="btn" onClick={saveProd}>{editProdId ? "Update produk" : "Simpan produk"}</button>
                 {editProdId && <button className="btn-ghost" onClick={() => {
-                  setEditProdId(null); setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({});
+                  setEditProdId(null); setBrand(""); setModel(""); setImage(""); setNote(""); setUtama(false); setSpecs({}); setDatasheetUrl(""); datasheetFileRef.current = null;
                 }}>Batal Edit</button>}
                 {pMsg && <span className="msg"><Check size={13} /> {pMsg}</span>}
               </div>
@@ -1172,7 +1226,22 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       } else {
                         // Auto-save product to Supabase
                         const id = `${slug(finalBrand)}-${slug(finalModel)}-${Math.random().toString(36).slice(2, 5)}`;
-                        const newProd = { id, cat: detectedCat, brand: finalBrand, model: finalModel, utama: false, specs: builtSpecs };
+                        
+                        // Upload PDF to Supabase Storage
+                        let pdfUrl = null;
+                        try {
+                          const storagePath = `datasheets/${id}.pdf`;
+                          const { error: uploadErr } = await supabase.storage.from("datasheets").upload(storagePath, file, {
+                            contentType: "application/pdf",
+                            upsert: true,
+                          });
+                          if (!uploadErr) {
+                            const { data: urlData } = supabase.storage.from("datasheets").getPublicUrl(storagePath);
+                            pdfUrl = urlData?.publicUrl || null;
+                          }
+                        } catch (_) { /* storage upload optional */ }
+                        
+                        const newProd = { id, cat: detectedCat, brand: finalBrand, model: finalModel, utama: false, specs: builtSpecs, datasheet_url: pdfUrl };
                         await supabase.from("products").upsert(newProd);
                         setProds(prev => [...prev, newProd]);
                         
@@ -1181,8 +1250,10 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                         setBrand(finalBrand);
                         setModel(finalModel);
                         setSpecs(detectedSpecs);
+                        setDatasheetUrl(pdfUrl || "");
+                        datasheetFileRef.current = file;
                         setSubTab("prods");
-                        setImportMsg(`✅ Produk "${finalBrand} ${finalModel}" berhasil diupload & disimpan ke database! Kategori: ${cats[detectedCat]?.label || detectedCat}. Form terisi untuk review.`);
+                        setImportMsg(`✅ Produk "${finalBrand} ${finalModel}" berhasil diupload & disimpan ke database! Kategori: ${cats[detectedCat]?.label || detectedCat}. ${pdfUrl ? "📄 PDF tersimpan." : ""} Form terisi untuk review.`);
                       }
                     } catch (err) {
                       setImportMsg("Gagal mengidentifikasi PDF: " + err.message);
@@ -1321,7 +1392,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                         <button className="icon-btn" style={{display: "inline-block", marginRight: 4}} title="Edit Produk" onClick={() => {
                           setSubTab("prods");
                           setEditProdId(p.id); setPCat(p.cat); setBrand(p.brand); setModel(p.model);
-                          setImage(p.image || ""); setNote(p.note || ""); setUtama(p.utama || false); setSpecs(p.specs || {});
+                          setImage(p.image || ""); setNote(p.note || ""); setUtama(p.utama || false); setSpecs(p.specs || {}); setDatasheetUrl(p.datasheet_url || "");
                           setTimeout(() => {
                             document.getElementById('product-form-panel')?.scrollIntoView({ behavior: 'smooth' });
                           }, 50);
