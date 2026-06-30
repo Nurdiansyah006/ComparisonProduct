@@ -1,0 +1,101 @@
+20:const SEED_CATS = {
+21-  drone: { label: "Drone / UAV", attrs: [
+22-    { key: "mtow",    label: "Berat lepas landas maks.", short: "Berat",     unit: "g",     type: "num", better: "low" },
+23-    { key: "payload", label: "Kapasitas payload",        short: "Payload",   unit: "g",     type: "num", better: "high" },
+24-    { key: "flight",  label: "Waktu terbang",            short: "Terbang",   unit: "menit", type: "num", better: "high" },
+25-    { key: "range",   label: "Jangkauan kendali",        short: "Jangkauan", unit: "km",    type: "num", better: "high" },
+26-    { key: "wind",    label: "Resistensi angin",         short: "Angin",     unit: "m/s",   type: "num", better: "high" },
+27-    { key: "ip",      label: "Rating IP",                short: "IP",        unit: "",      type: "txt" },
+28-    { key: "rtk",     label: "RTK terintegrasi",         short: "RTK",       unit: "",      type: "bool" },
+29-  ]},
+30-  total_station: { label: "Total Station", attrs: [
+31-    { key: "ang",    label: "Akurasi sudut",          short: "Akurasi sdt", unit: "\u2033", type: "num", better: "low" },
+32-    { key: "dist",   label: "Akurasi jarak",          short: "Akurasi jrk", unit: "mm",     type: "num", better: "low" },
+33-    { key: "prism",  label: "Jangkauan prisma",       short: "Prisma",      unit: "m",      type: "num", better: "high" },
+34-    { key: "norefl", label: "Jangkauan tanpa prisma", short: "Tanpa prisma",unit: "m",      type: "num", better: "high" },
+35-    { key: "mag",    label: "Perbesaran teropong",    short: "Perbesaran",  unit: "x",      type: "num", better: "high" },
+36-    { key: "weight", label: "Berat instrumen",        short: "Berat",       unit: "g",      type: "num", better: "low" },
+37-  ]},
+38-  gnss: { label: "GNSS Receiver", attrs: [
+39-    { key: "channels", label: "Jumlah kanal",           short: "Kanal",      unit: "",     type: "num", better: "high" },
+40-    { key: "acc_h",    label: "Akurasi horizontal RTK", short: "Akurasi H",  unit: "mm",   type: "num", better: "low" },
+41-    { key: "acc_v",    label: "Akurasi vertikal RTK",   short: "Akurasi V",  unit: "mm",   type: "num", better: "low" },
+42-    { key: "constel",  label: "Konstelasi didukung",    short: "Konstelasi", unit: "",     type: "num", better: "high" },
+43-    { key: "battery",  label: "Daya tahan baterai",     short: "Baterai",    unit: "jam",  type: "num", better: "high" },
+44-    { key: "weight",   label: "Berat receiver",         short: "Berat",      unit: "g",    type: "num", better: "low" },
+45-    { key: "ip",       label: "Rating IP",              short: "IP",         unit: "",     type: "txt" },
+46-  ]},
+47-  autolevel: { label: "Auto Level", attrs: [
+48-    { key: "acc",      label: "Akurasi (km, double run)", short: "Akurasi",   unit: "mm",  type: "num", better: "low" },
+49-    { key: "mag",      label: "Perbesaran teropong",      short: "Perbesaran",unit: "x",   type: "num", better: "high" },
+50-    { key: "minfocus", label: "Jarak fokus minimum",      short: "Fokus min", unit: "m",   type: "num", better: "low" },
+51-    { key: "range",    label: "Jangkauan ukur",           short: "Jangkauan", unit: "m",   type: "num", better: "high" },
+52-    { key: "weight",   label: "Berat instrumen",          short: "Berat",     unit: "g",   type: "num", better: "low" },
+53-  ]},
+54-  lidar: { label: "Payload — LiDAR", attrs: [
+55-    { key: "range",    label: "Jangkauan deteksi", short: "Jangkauan", unit: "m",      type: "num", better: "high" },
+56-    { key: "accuracy", label: "Akurasi sistem",    short: "Akurasi",   unit: "cm",     type: "num", better: "low" },
+57-    { key: "rate",     label: "Kecepatan titik",   short: "Kec. titik",unit: "rb/dtk", type: "num", better: "high" },
+58-    { key: "returns",  label: "Jumlah return",     short: "Return",    unit: "",       type: "num", better: "high" },
+59-    { key: "weight",   label: "Berat unit",        short: "Berat",     unit: "g",      type: "num", better: "low" },
+60-    { key: "camera",   label: "Kamera RGB",        short: "Kamera",    unit: "MP",     type: "num", better: "high" },
+61-  ]},
+62-  camera: { label: "Payload — Kamera", attrs: [
+63-    { key: "res",     label: "Resolusi",        short: "Resolusi", unit: "MP",      type: "num", better: "high" },
+64-    { key: "pixel",   label: "Ukuran piksel",   short: "Piksel",   unit: "\u00b5m", type: "num", better: "high" },
+65-    { key: "gsd",     label: "GSD min @100m",   short: "GSD",      unit: "cm",      type: "num", better: "low" },
+66-    { key: "band",    label: "Jumlah band",     short: "Band",     unit: "",        type: "num", better: "high" },
+67-    { key: "weight",  label: "Berat unit",      short: "Berat",    unit: "g",       type: "num", better: "low" },
+68-    { key: "shutter", label: "Shutter mekanis", short: "Shutter",  unit: "",        type: "bool" },
+69-  ]},
+70-};
+71-
+72-const SEED_PRODUCTS = [
+73-  { id: "chc-x500", cat: "drone", brand: "CHC", model: "BB4 UAV X500", utama: true,  specs: { mtow: 5200, payload: 1500, flight: 55, range: 8, wind: 12, ip: "IP55", rtk: true } },
+74-  { id: "dji-m400", cat: "drone", brand: "DJI", model: "Matrice 400",  utama: false, specs: { mtow: 6000, payload: 2000, flight: 59, range: 20, wind: 12, ip: "IP55", rtk: true } },
+75-  { id: "dji-m350", cat: "drone", brand: "DJI", model: "Matrice 350 RTK", utama: false, specs: { mtow: 6300, payload: 1300, flight: 55, range: 20, wind: 12, ip: "IP55", rtk: true } },
+76-  { id: "dji-m300", cat: "drone", brand: "DJI", model: "Matrice 300 RTK", utama: false, specs: { mtow: 6300, payload: 1170, flight: 55, range: 15, wind: 15, ip: "IP45", rtk: true } },
+77-
+78-  { id: "chc-cts112",  cat: "total_station", brand: "CHC",    model: "CTS-112R4", utama: true,  specs: { ang: 2, dist: 2,   prism: 5000, norefl: 800,  mag: 30, weight: 5400 } },
+79-  { id: "leica-ts07",  cat: "total_station", brand: "Leica",  model: "TS07",      utama: false, specs: { ang: 1, dist: 1.5, prism: 3500, norefl: 1000, mag: 30, weight: 5100 } },
+80-  { id: "topcon-gm52", cat: "total_station", brand: "Topcon", model: "GM-52",     utama: false, specs: { ang: 2, dist: 2,   prism: 6000, norefl: 1000, mag: 30, weight: 5200 } },
+81-  { id: "sokkia-ix505",cat: "total_station", brand: "Sokkia", model: "iX-505",    utama: false, specs: { ang: 5, dist: 2,   prism: 6000, norefl: 800,  mag: 30, weight: 5300 } },
+82-  { id: "south-n7",    cat: "total_station", brand: "South",  model: "N7",        utama: false, specs: { ang: 2, dist: 2,   prism: 5000, norefl: 600,  mag: 30, weight: 5500 } },
+83-
+84-  { id: "chc-i93",      cat: "gnss", brand: "CHC",     model: "i93 IMU-RTK",   utama: true,  specs: { channels: 1408, acc_h: 8,  acc_v: 15, constel: 7, battery: 16, weight: 940,  ip: "IP67" } },
+85-  { id: "trimble-r12i", cat: "gnss", brand: "Trimble", model: "R12i",          utama: false, specs: { channels: 672,  acc_h: 8,  acc_v: 15, constel: 6, battery: 6,  weight: 1120, ip: "IP67" } },
+86-  { id: "leica-gs18",   cat: "gnss", brand: "Leica",   model: "GS18 T",        utama: false, specs: { channels: 555,  acc_h: 8,  acc_v: 15, constel: 5, battery: 8,  weight: 830,  ip: "IP68" } },
+87-  { id: "topcon-hiper", cat: "gnss", brand: "Topcon",  model: "Hiper VR",      utama: false, specs: { channels: 226,  acc_h: 10, acc_v: 15, constel: 5, battery: 7,  weight: 1010, ip: "IP67" } },
+88-  { id: "south-g1",     cat: "gnss", brand: "South",   model: "Galaxy G1 Plus",utama: false, specs: { channels: 1598, acc_h: 8,  acc_v: 15, constel: 7, battery: 12, weight: 970,  ip: "IP68" } },
+89-
+90-  { id: "sokkia-b40a", cat: "autolevel", brand: "Sokkia", model: "B40A",   utama: false, specs: { acc: 2.0, mag: 24, minfocus: 0.2, range: 100, weight: 1500 } },
+91-  { id: "leica-na532", cat: "autolevel", brand: "Leica",  model: "NA532",  utama: false, specs: { acc: 1.8, mag: 32, minfocus: 0.3, range: 120, weight: 1600 } },
+92-  { id: "topcon-atb4a",cat: "autolevel", brand: "Topcon", model: "AT-B4A", utama: false, specs: { acc: 2.0, mag: 24, minfocus: 0.2, range: 100, weight: 1500 } },
+93-  { id: "nikon-ax2s",  cat: "autolevel", brand: "Nikon",  model: "AX-2S",  utama: false, specs: { acc: 2.5, mag: 20, minfocus: 0.5, range: 90,  weight: 1300 } },
+94-
+95-  { id: "chc-aa6",   cat: "lidar", brand: "CHC",   model: "AlphaAir 6 (AA6)",  utama: true,  specs: { range: 200, accuracy: 3,   rate: 240, returns: 3, weight: 1100, camera: 26 } },
+96-  { id: "chc-aa10",  cat: "lidar", brand: "CHC",   model: "AlphaAir 10 (AA10)",utama: true,  specs: { range: 450, accuracy: 2,   rate: 320, returns: 5, weight: 1280, camera: 26 } },
+97-  { id: "dji-l2",    cat: "lidar", brand: "DJI",   model: "Zenmuse L2",        utama: false, specs: { range: 250, accuracy: 4,   rate: 240, returns: 5, weight: 905,  camera: 20 } },
+98-  { id: "riegl-vux", cat: "lidar", brand: "RIEGL", model: "miniVUX-3UAV",      utama: false, specs: { range: 300, accuracy: 1.5, rate: 300, returns: 5, weight: 1600, camera: 26 } },
+99-
+100-  { id: "phaseone-ixm", cat: "camera", brand: "Phase One", model: "iXM-100",    utama: false, specs: { res: 100, pixel: 3.76, gsd: 1.0, band: 1, weight: 630, shutter: true } },
+101-  { id: "sony-a7r5",    cat: "camera", brand: "Sony",      model: "a7R V",      utama: false, specs: { res: 61,  pixel: 3.76, gsd: 1.3, band: 1, weight: 723, shutter: true } },
+102-  { id: "dji-p1",       cat: "camera", brand: "DJI",       model: "Zenmuse P1", utama: false, specs: { res: 45,  pixel: 4.4,  gsd: 1.5, band: 1, weight: 800, shutter: true } },
+103-  { id: "micasense",    cat: "camera", brand: "Micasense", model: "RedEdge-P",  utama: false, specs: { res: 1.6, pixel: 3.45, gsd: 2.0, band: 6, weight: 230, shutter: false } },
+104-];
+105-
+106-const COMPAT = [
+107-  { drone: "chc-x500", payload: "chc-aa6",  status: "ok",      note: "Mounting native skyport CHC. Plug-and-play." },
+108-  { drone: "chc-x500", payload: "chc-aa10", status: "ok",      note: "Didukung penuh, dalam batas payload 1500 g." },
+109-  { drone: "chc-x500", payload: "dji-l2",   status: "no",      note: "Antarmuka gimbal DSDK tidak kompatibel dgn skyport CHC." },
+110-  { drone: "chc-x500", payload: "dji-p1",   status: "no",      note: "Mount DJI E-Port tidak tersedia pada X500." },
+111-  { drone: "dji-m400", payload: "dji-l2",   status: "ok",      note: "Mounting DJI E-Port. Native." },
+112-  { drone: "dji-m400", payload: "dji-p1",   status: "ok",      note: "Mounting DJI E-Port. Native." },
+113-  { drone: "dji-m400", payload: "chc-aa6",  status: "adapter", note: "Perlu bracket adapter pihak ketiga; sumber daya terpisah." },
+114-  { drone: "dji-m350", payload: "dji-l2",   status: "ok",      note: "Mounting DJI Skyport native." },
+115-  { drone: "dji-m350", payload: "dji-p1",   status: "ok",      note: "Mounting DJI Skyport native." },
+116-  { drone: "dji-m350", payload: "chc-aa6",  status: "adapter", note: "Perlu bracket adapter; cek batas payload 1300 g." },
+117-  { drone: "dji-m300", payload: "dji-l2",   status: "ok",      note: "Mounting DJI Skyport native." },
+118-  { drone: "dji-m300", payload: "dji-p1",   status: "ok",      note: "Mounting DJI Skyport native." },
+119-];
+120-

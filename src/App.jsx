@@ -651,6 +651,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
 
   const [importJson, setImportJson] = useState("");
   const [importMsg, setImportMsg] = useState("");
+  const [pdfPreview, setPdfPreview] = useState(null); // { thumb, name, pages }
 
   const handleImport = () => {
     try {
@@ -915,6 +916,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                   reader.onload = async (ev) => {
                     try {
                       setImportMsg("Sedang mengidentifikasi dokumen PDF...");
+                      setPdfPreview(null);
                       const pdfjsLib = window['pdfjs-dist/build/pdf'];
                       if (!pdfjsLib) {
                         throw new Error("Library PDF.js tidak terdeteksi. Silakan segarkan halaman.");
@@ -924,6 +926,19 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                       const loadingTask = pdfjsLib.getDocument({ data: ev.target.result });
                       const pdf = await loadingTask.promise;
                       let fullText = "";
+                      
+                      // Render first page as thumbnail
+                      try {
+                        const thumbPage = await pdf.getPage(1);
+                        const scale = 1.2;
+                        const viewport = thumbPage.getViewport({ scale });
+                        const canvas = document.createElement("canvas");
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const ctx = canvas.getContext("2d");
+                        await thumbPage.render({ canvasContext: ctx, viewport }).promise;
+                        setPdfPreview({ thumb: canvas.toDataURL("image/png"), name: file.name, pages: pdf.numPages });
+                      } catch (_) { /* thumbnail optional */ }
                       for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
@@ -1182,6 +1197,75 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
               <p className="note-sm" style={{ fontSize: 11, color: "var(--mut)", marginTop: 6 }}>
                 Upload Produk / File (PDF/CSV/PNG etc)
               </p>
+
+              {/* PDF Preview Card with Animation */}
+              {pdfPreview && (
+                <div style={{
+                  marginTop: 16,
+                  border: "1.5px solid var(--line)",
+                  borderRadius: 12,
+                  padding: 14,
+                  display: "flex",
+                  gap: 16,
+                  alignItems: "center",
+                  background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
+                  animation: "pdfSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+                  boxShadow: "0 2px 12px rgba(99, 102, 241, 0.08)",
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    flexShrink: 0,
+                    width: 80,
+                    height: 100,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                    background: "white",
+                    animation: "pdfThumbPulse 2s ease-in-out infinite",
+                  }}>
+                    <img src={pdfPreview.thumb} alt="PDF preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      📄 {pdfPreview.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--mut)", marginTop: 4 }}>
+                      {pdfPreview.pages} halaman · PDF berhasil diproses
+                    </div>
+                    <div style={{
+                      marginTop: 8,
+                      height: 4,
+                      borderRadius: 2,
+                      background: "#e2e8f0",
+                      overflow: "hidden",
+                    }}>
+                      <div style={{
+                        height: "100%",
+                        borderRadius: 2,
+                        background: "linear-gradient(90deg, #6366f1, #38bdf8)",
+                        animation: "pdfProgressBar 1s ease-out forwards",
+                      }} />
+                    </div>
+                  </div>
+                  <button onClick={() => setPdfPreview(null)} style={{
+                    flexShrink: 0,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--mut)",
+                    padding: 4,
+                    borderRadius: 6,
+                    transition: "color 0.2s",
+                  }}
+                    onMouseEnter={e => e.target.style.color = "var(--red)"}
+                    onMouseLeave={e => e.target.style.color = "var(--mut)"}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               {importMsg && <span className="msg" style={{ color: importMsg.includes("Gagal") ? "var(--red)" : "#1f7a3d", display: "block", marginTop: 8 }}>{importMsg}</span>}
             </div>
           </div>
