@@ -957,12 +957,12 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                         detectedCat = "drone";
                       } else if (textLower.includes("total station") || textLower.includes("theodolite") || textLower.includes("reflectorless")) {
                         detectedCat = "total_station";
-                      } else if (textLower.includes("gnss") || textLower.includes("imu-rtk") || textLower.includes("rtk receiver") || textLower.includes("constellation")) {
-                        detectedCat = "gnss";
                       } else if (textLower.includes("auto level") || textLower.includes("autolevel") || textLower.includes("waterpass")) {
                         detectedCat = "autolevel";
-                      } else if (textLower.includes("lidar") || textLower.includes("laser scanner") || textLower.includes("point cloud")) {
+                      } else if (textLower.includes("lidar") || textLower.includes("laser scanner") || textLower.includes("point cloud") || textLower.includes("zenmuse l") || textLower.includes("point rate") || textLower.includes("scanning") || textLower.includes("repetitive scan") || textLower.includes("returns")) {
                         detectedCat = "lidar";
+                      } else if (textLower.includes("gnss") || textLower.includes("imu-rtk") || textLower.includes("rtk receiver") || textLower.includes("constellation")) {
+                        detectedCat = "gnss";
                       } else if (textLower.includes("camera") || textLower.includes("kamera") || textLower.includes("sensor size") || textLower.includes("megapixel")) {
                         detectedCat = "camera";
                       }
