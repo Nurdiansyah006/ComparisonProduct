@@ -852,7 +852,7 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
             <div className="panel-h"><Upload size={14} /> Upload Produk / File (PDF/CSV/PNG etc)</div>
             <div className="form">
               <label className="lbl">Pilih file produk / datasheet</label>
-              <input type="file" accept=".json,.csv,.xlsx,.xls" className="inp" onChange={(e) => {
+              <input type="file" accept=".json,.csv,.xlsx,.xls,.pdf" className="inp" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
@@ -911,8 +911,244 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                     }
                   };
                   reader.readAsArrayBuffer(file);
+                } else if (ext === "pdf") {
+                  reader.onload = async (ev) => {
+                    try {
+                      setImportMsg("Sedang mengidentifikasi dokumen PDF...");
+                      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+                      if (!pdfjsLib) {
+                        throw new Error("Library PDF.js tidak terdeteksi. Silakan segarkan halaman.");
+                      }
+                      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                      
+                      const loadingTask = pdfjsLib.getDocument({ data: ev.target.result });
+                      const pdf = await loadingTask.promise;
+                      let fullText = "";
+                      for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(" ");
+                        fullText += pageText + "\n";
+                      }
+                      
+                      if (!fullText.trim()) {
+                        throw new Error("Teks tidak dapat diekstrak dari PDF. Pastikan dokumen bukan berupa scan gambar murni.");
+                      }
+                      
+                      let detectedCat = "";
+                      const textLower = fullText.toLowerCase();
+                      
+                      if (textLower.includes("drone") || textLower.includes("uav") || textLower.includes("multirotor") || textLower.includes("copter")) {
+                        detectedCat = "drone";
+                      } else if (textLower.includes("total station") || textLower.includes("theodolite") || textLower.includes("reflectorless")) {
+                        detectedCat = "total_station";
+                      } else if (textLower.includes("gnss") || textLower.includes("imu-rtk") || textLower.includes("rtk receiver") || textLower.includes("constellation")) {
+                        detectedCat = "gnss";
+                      } else if (textLower.includes("auto level") || textLower.includes("autolevel") || textLower.includes("waterpass")) {
+                        detectedCat = "autolevel";
+                      } else if (textLower.includes("lidar") || textLower.includes("laser scanner") || textLower.includes("point cloud")) {
+                        detectedCat = "lidar";
+                      } else if (textLower.includes("camera") || textLower.includes("kamera") || textLower.includes("sensor size") || textLower.includes("megapixel")) {
+                        detectedCat = "camera";
+                      }
+                      
+                      let detectedBrand = "";
+                      const brands = ["DJI", "CHC", "Leica", "Trimble", "Topcon", "Sokkia", "South", "Nikon", "Phase One", "Sony", "Micasense"];
+                      for (const b of brands) {
+                        const bRegex = new RegExp("\\b" + b.replace(/\s+/g, "\\s+") + "\\b", "i");
+                        if (bRegex.test(fullText)) {
+                          detectedBrand = b;
+                          break;
+                        }
+                      }
+                      
+                      let detectedModel = "";
+                      if (detectedBrand) {
+                        const brandEscaped = detectedBrand.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+                        const modelRegex = new RegExp(brandEscaped + "\\s+([a-zA-Z0-9\\s\\-\\(\\)]+)", "i");
+                        const match = fullText.match(modelRegex);
+                        if (match && match[1]) {
+                          const parts = match[1].split(/\n|\r/);
+                          detectedModel = parts[0].trim().split(/\s{2,}/)[0].slice(0, 30);
+                        }
+                      }
+                      
+                      if (!detectedCat) {
+                        detectedCat = Object.keys(cats)[0];
+                      }
+                      
+                      const detectedSpecs = {};
+                      const getNumberNear = (keywordRegex, suffixRegex = null, contextChars = 85) => {
+                        const matchIndex = fullText.search(keywordRegex);
+                        if (matchIndex === -1) return null;
+                        
+                        const start = Math.max(0, matchIndex - 30);
+                        const end = Math.min(fullText.length, matchIndex + contextChars);
+                        const context = fullText.slice(start, end);
+                        
+                        if (suffixRegex) {
+                          const suffixMatch = context.match(suffixRegex);
+                          if (suffixMatch) {
+                            const val = parseFloat(suffixMatch[1].replace(/,/g, ''));
+                            if (!isNaN(val)) return val;
+                          }
+                        }
+                        
+                        const numRegex = /(\d+(?:\.\d+)?)/g;
+                        let m;
+                        const numbers = [];
+                        while ((m = numRegex.exec(context)) !== null) {
+                          const val = parseFloat(m[1]);
+                          if (!isNaN(val)) numbers.push(val);
+                        }
+                        return numbers.length > 0 ? numbers[0] : null;
+                      };
+                      
+                      const targetAttrs = cats[detectedCat]?.attrs || [];
+                      targetAttrs.forEach(attr => {
+                        if (attr.type === "num") {
+                          let val = null;
+                          if (detectedCat === "drone" && attr.key === "mtow") {
+                            val = getNumberNear(/mtow|takeoff|take-off|lepas\s+landas/i, /(\d+(?:\.\d+)?)\s*kg/i);
+                            if (val && val < 50) val = val * 1000;
+                            if (!val) val = getNumberNear(/mtow|takeoff|take-off|lepas\s+landas/i);
+                          } else if (detectedCat === "drone" && attr.key === "payload") {
+                            val = getNumberNear(/payload|kapasitas|beban/i, /(\d+(?:\.\d+)?)\s*kg/i);
+                            if (val && val < 50) val = val * 1000;
+                            if (!val) val = getNumberNear(/payload|kapasitas|beban/i);
+                          } else if (detectedCat === "drone" && attr.key === "flight") {
+                            val = getNumberNear(/flight\s+time|waktu\s+terbang|terbang|durasi/i);
+                          } else if (detectedCat === "drone" && attr.key === "range") {
+                            val = getNumberNear(/control\s+range|transmission|jangkauan|transmisi/i);
+                          } else if (detectedCat === "drone" && attr.key === "wind") {
+                            val = getNumberNear(/wind|angin|hembusan/i);
+                          } else if (detectedCat === "total_station" && attr.key === "ang") {
+                            val = getNumberNear(/ang|accuracy|akurasi|sudut/i, /(\d+(?:\.\d+)?)(?:"|”|\s*sec|sdt)/i);
+                            if (!val) val = getNumberNear(/ang|accuracy|akurasi|sudut/i);
+                          } else if (detectedCat === "total_station" && attr.key === "dist") {
+                            val = getNumberNear(/dist|jarak|prism/i, /(\d+(?:\.\d+)?)\s*mm/i);
+                            if (!val) val = getNumberNear(/dist|jarak|prism/i);
+                          } else if (detectedCat === "total_station" && attr.key === "prism") {
+                            val = getNumberNear(/prism|prisma/i, /(\d+(?:\.\d+)?)\s*m/i);
+                            if (!val) val = getNumberNear(/prism|prisma/i);
+                          } else if (detectedCat === "total_station" && attr.key === "norefl") {
+                            val = getNumberNear(/reflectorless|non-prism|tanpa\s+prisma/i, /(\d+(?:\.\d+)?)\s*m/i);
+                            if (!val) val = getNumberNear(/reflectorless|non-prism|tanpa\s+prisma/i);
+                          } else if (detectedCat === "total_station" && attr.key === "mag") {
+                            val = getNumberNear(/magnification|perbesaran/i, /(\d+)\s*x/i);
+                            if (!val) val = getNumberNear(/magnification|perbesaran/i);
+                          } else if (detectedCat === "total_station" && attr.key === "weight") {
+                            val = getNumberNear(/weight|berat/i, /(\d+(?:\.\d+)?)\s*kg/i);
+                            if (val && val < 50) val = val * 1000;
+                            if (!val) val = getNumberNear(/weight|berat/i);
+                          } else if (detectedCat === "gnss" && attr.key === "channels") {
+                            val = getNumberNear(/channel|kanal|saluran/i);
+                          } else if (detectedCat === "gnss" && attr.key === "acc_h") {
+                            val = getNumberNear(/horizontal|presisi\s+h|h-accuracy/i, /(\d+(?:\.\d+)?)\s*mm/i);
+                            if (!val) val = getNumberNear(/horizontal|presisi\s+h|h-accuracy/i);
+                          } else if (detectedCat === "gnss" && attr.key === "acc_v") {
+                            val = getNumberNear(/vertical|presisi\s+v|v-accuracy/i, /(\d+(?:\.\d+)?)\s*mm/i);
+                            if (!val) val = getNumberNear(/vertical|presisi\s+v|v-accuracy/i);
+                          } else if (detectedCat === "gnss" && attr.key === "constel") {
+                            let count = 0;
+                            ["gps", "glonass", "galileo", "beidou", "qzss", "sbas"].forEach(c => {
+                              if (textLower.includes(c)) count++;
+                            });
+                            val = count || 4;
+                          } else if (detectedCat === "gnss" && attr.key === "battery") {
+                            val = getNumberNear(/battery|baterai|operasi/i, /(\d+(?:\.\d+)?)\s*h/i);
+                            if (!val) val = getNumberNear(/battery|baterai|operasi/i);
+                          } else if (detectedCat === "gnss" && attr.key === "weight") {
+                            val = getNumberNear(/weight|berat/i, /(\d+(?:\.\d+)?)\s*g/i);
+                            if (val && val < 5) val = val * 1000;
+                            if (!val) val = getNumberNear(/weight|berat/i);
+                          } else if (detectedCat === "autolevel" && attr.key === "acc") {
+                            val = getNumberNear(/acc|akurasi|double\s+run/i, /(\d+(?:\.\d+)?)\s*mm/i);
+                            if (!val) val = getNumberNear(/acc|akurasi|double\s+run/i);
+                          } else if (detectedCat === "autolevel" && attr.key === "mag") {
+                            val = getNumberNear(/magnification|perbesaran/i, /(\d+)\s*x/i);
+                            if (!val) val = getNumberNear(/magnification|perbesaran/i);
+                          } else if (detectedCat === "autolevel" && attr.key === "minfocus") {
+                            val = getNumberNear(/min\s+focus|jarak\s+fokus/i, /(\d+(?:\.\d+)?)\s*m/i);
+                            if (!val) val = getNumberNear(/min\s+focus|jarak\s+fokus/i);
+                          } else if (detectedCat === "autolevel" && attr.key === "range") {
+                            val = getNumberNear(/range|jangkauan/i, /(\d+(?:\.\d+)?)\s*m/i);
+                            if (!val) val = getNumberNear(/range|jangkauan/i);
+                          } else if (detectedCat === "autolevel" && attr.key === "weight") {
+                            val = getNumberNear(/weight|berat/i, /(\d+(?:\.\d+)?)\s*kg/i);
+                            if (val && val < 50) val = val * 1000;
+                            if (!val) val = getNumberNear(/weight|berat/i);
+                          } else if (detectedCat === "lidar" && attr.key === "range") {
+                            val = getNumberNear(/range|jangkauan|deteksi/i, /(\d+(?:\.\d+)?)\s*m/i);
+                            if (!val) val = getNumberNear(/range|jangkauan|deteksi/i);
+                          } else if (detectedCat === "lidar" && attr.key === "accuracy") {
+                            val = getNumberNear(/accuracy|akurasi/i, /(\d+(?:\.\d+)?)\s*cm/i);
+                            if (!val) val = getNumberNear(/accuracy|akurasi/i);
+                          } else if (detectedCat === "lidar" && attr.key === "rate") {
+                            val = getNumberNear(/rate|kecepatan|point|titik/i, /(\d+(?:\.\d+)?)\s*k/i);
+                            if (!val) val = getNumberNear(/rate|kecepatan|point|titik/i);
+                          } else if (detectedCat === "lidar" && attr.key === "returns") {
+                            val = getNumberNear(/return|pantulan|echo/i);
+                          } else if (detectedCat === "lidar" && attr.key === "weight") {
+                            val = getNumberNear(/weight|berat/i, /(\d+(?:\.\d+)?)\s*g/i);
+                            if (val && val < 5) val = val * 1000;
+                            if (!val) val = getNumberNear(/weight|berat/i);
+                          } else if (detectedCat === "lidar" && attr.key === "camera") {
+                            val = getNumberNear(/camera|kamera|rgb/i, /(\d+(?:\.\d+)?)\s*mp/i);
+                            if (!val) val = getNumberNear(/camera|kamera|rgb/i);
+                          } else if (detectedCat === "camera" && attr.key === "res") {
+                            val = getNumberNear(/resolution|resolusi|pixel|sensor/i, /(\d+(?:\.\d+)?)\s*mp/i);
+                            if (!val) val = getNumberNear(/resolution|resolusi|pixel|sensor/i);
+                          } else if (detectedCat === "camera" && attr.key === "pixel") {
+                            val = getNumberNear(/pixel\s+size|ukuran\s+piksel/i, /(\d+(?:\.\d+)?)\s*(?:um|µm)/i);
+                            if (!val) val = getNumberNear(/pixel\s+size|ukuran\s+piksel/i);
+                          } else if (detectedCat === "camera" && attr.key === "gsd") {
+                            val = getNumberNear(/gsd/i, /(\d+(?:\.\d+)?)\s*cm/i);
+                            if (!val) val = getNumberNear(/gsd/i);
+                          } else if (detectedCat === "camera" && attr.key === "band") {
+                            val = getNumberNear(/band|channel/i);
+                          } else if (detectedCat === "camera" && attr.key === "weight") {
+                            val = getNumberNear(/weight|berat/i, /(\d+(?:\.\d+)?)\s*g/i);
+                            if (val && val < 5) val = val * 1000;
+                            if (!val) val = getNumberNear(/weight|berat/i);
+                          }
+                          
+                          if (val !== null && !isNaN(val)) {
+                            detectedSpecs[attr.key] = val;
+                          }
+                        } else if (attr.type === "bool") {
+                          let val = false;
+                          if (detectedCat === "drone" && attr.key === "rtk") {
+                            val = textLower.includes("rtk") || textLower.includes("real-time kinematic");
+                          } else if (detectedCat === "camera" && attr.key === "shutter") {
+                            val = textLower.includes("shutter") && (textLower.includes("mechanical") || textLower.includes("mekanis") || textLower.includes("global"));
+                          }
+                          detectedSpecs[attr.key] = val;
+                        } else if (attr.type === "txt") {
+                          let val = "";
+                          if (attr.key === "ip") {
+                            const ipMatch = fullText.match(/IP\s*([0-9]{2})/i);
+                            if (ipMatch) val = "IP" + ipMatch[1];
+                          }
+                          if (val) {
+                            detectedSpecs[attr.key] = val;
+                          }
+                        }
+                      });
+                      
+                      setPCat(detectedCat);
+                      setBrand(detectedBrand || "");
+                      setModel(detectedModel || "");
+                      setSpecs(detectedSpecs);
+                      setSubTab("prods");
+                      setImportMsg(`Identifikasi PDF Berhasil! Brand: ${detectedBrand || 'Mungkin CHC/DJI'}, Model: ${detectedModel || 'Tidak terdeteksi'}. Silakan lengkapi dan simpan.`);
+                    } catch (err) {
+                      setImportMsg("Gagal mengidentifikasi PDF: " + err.message);
+                    }
+                  };
+                  reader.readAsArrayBuffer(file);
                 } else {
-                  setImportMsg("Gagal: Format file tidak didukung. Gunakan .json, .csv, atau .xlsx.");
+                  setImportMsg("Gagal: Format file tidak didukung. Gunakan .json, .csv, .xlsx, atau .pdf.");
                 }
                 e.target.value = "";
               }} />
