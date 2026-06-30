@@ -1135,28 +1135,40 @@ function ManageMode({ cats, setCats, prods, setProds, compat, setCompat }) {
                           }
                         }
                       });
+                      // Build final specs matching the category schema
+                      const builtSpecs = {};
+                      targetAttrs.forEach((a) => {
+                        const raw = detectedSpecs[a.key];
+                        builtSpecs[a.key] = a.type === "num" ? (raw === "" || raw == null ? null : Number(raw))
+                          : a.type === "bool" ? !!raw : (raw || "");
+                      });
                       
-                      const id = `${slug(detectedBrand || 'brand')}-${slug(detectedModel || 'model')}-${Math.random().toString(36).slice(2, 5)}`;
-                      const newProd = {
-                        id,
-                        cat: detectedCat,
-                        brand: (detectedBrand || "Unknown").trim(),
-                        model: (detectedModel || "Unknown").trim(),
-                        utama: false,
-                        image: "",
-                        note: "",
-                        specs: detectedSpecs
-                      };
+                      const finalBrand = (detectedBrand || "").trim();
+                      const finalModel = (detectedModel || "").trim();
                       
-                      await supabase.from("products").insert([newProd]);
-                      setProds([...prods, newProd]);
-                      
-                      setPCat(detectedCat);
-                      setBrand((detectedBrand || "Unknown").trim());
-                      setModel((detectedModel || "Unknown").trim());
-                      setSpecs(detectedSpecs);
-                      setSubTab("list");
-                      setImportMsg(`Berhasil mengidentifikasi & menyimpan produk "${newProd.brand} ${newProd.model}" ke database.`);
+                      if (!finalBrand || !finalModel) {
+                        // Not enough info to auto-save — fill form for manual completion
+                        setPCat(detectedCat);
+                        setBrand(finalBrand);
+                        setModel(finalModel);
+                        setSpecs(detectedSpecs);
+                        setSubTab("prods");
+                        setImportMsg(`⚠️ PDF diidentifikasi tapi Brand/Model tidak cukup jelas. Silakan lengkapi form dan simpan manual.`);
+                      } else {
+                        // Auto-save product to Supabase
+                        const id = `${slug(finalBrand)}-${slug(finalModel)}-${Math.random().toString(36).slice(2, 5)}`;
+                        const newProd = { id, cat: detectedCat, brand: finalBrand, model: finalModel, utama: false, specs: builtSpecs };
+                        await supabase.from("products").upsert(newProd);
+                        setProds(prev => [...prev, newProd]);
+                        
+                        // Also fill form for review/edit
+                        setPCat(detectedCat);
+                        setBrand(finalBrand);
+                        setModel(finalModel);
+                        setSpecs(detectedSpecs);
+                        setSubTab("prods");
+                        setImportMsg(`✅ Produk "${finalBrand} ${finalModel}" berhasil diupload & disimpan ke database! Kategori: ${cats[detectedCat]?.label || detectedCat}. Form terisi untuk review.`);
+                      }
                     } catch (err) {
                       setImportMsg("Gagal mengidentifikasi PDF: " + err.message);
                     }
